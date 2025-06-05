@@ -15,7 +15,7 @@
         </div>
         <div>
             <table>
-                <caption>Liste des catégories</caption>
+                <caption>Liste des catégories {{ data.page + 1 }} / {{ data.totalPages }}</caption>
                 <tr>
                     <th>Code</th>
                     <th>Libelle</th>
@@ -37,6 +37,12 @@
                         </button>
                     </td>
                 </tr>
+                <tr>
+                    <td><button>🔙</button></td>
+                    <td><button @click="previousPage">⬅️</button></td>
+                    <td><button @click="nextPage">➡️</button></td>
+                    <td><button>🔜</button></td>
+                </tr>
             </table>
         </div>
     </main>
@@ -56,7 +62,9 @@ let data = reactive({
     // Les données saisies dans le formulaire
     formulaireCategorie: { ...categorieVide },
     // La liste des catégories affichée sous forme de table
-    listeCategories: []
+    listeCategories: [],
+    page: 0,
+    totalPages: 0
 });
 
 function showError(error) {
@@ -69,9 +77,11 @@ function chargeCategories() {
     // Appel à l'API pour avoir la liste des catégories
     // Trié par code, descendant
     // Verbe HTTP GET par défaut
-    doAjaxRequest("/api/categories?sort=code,desc")
+    doAjaxRequest(`/api/categories?page=${data.page}&size=5&sort=code,desc`)
         .then((json) => {
+            console.log(json)
             data.listeCategories = json._embedded.categories;
+            data.totalPages = json.page.totalPages
         })
         .catch(showError);
 }
@@ -100,10 +110,28 @@ function ajouteCategorie() {
  * @param entityRef l'URI de l'entité à supprimer
  */
 function deleteEntity(entityRef) {
-    doAjaxRequest(entityRef, { method: "DELETE", headers: { "Accept": "application/json" }})
+    doAjaxRequest(entityRef, { method: "DELETE", headers: { "Accept": "application/json" } })
         .then(chargeCategories)
         .catch(showError);
 }
+function nextPage() {
+    if (data.page < data.totalPages - 1) {
+        data.page++;
+        chargeCategories();
+    } else {
+        alert("Déjà à la dernière page");
+    }
+}
+
+function previousPage() {
+    if (data.page > 0) {
+        data.page--;
+        chargeCategories();
+    } else {
+        alert("Déjà à la première page");
+    }
+}
+
 
 // A l'affichage du composant, on affiche la liste
 onMounted(chargeCategories);

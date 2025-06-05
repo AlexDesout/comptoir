@@ -1,156 +1,122 @@
 <template>
-    <main>
-        <div>
-            <h1>Les produits</h1>
-        </div>
-        <div>
-            <table>
-                <caption>Liste des produits {{ data.page + 1 }} / {{ data.totalPages }}</caption>
-                <tr>
-                    <th>Nom</th>
-                    <th>Prix</th>
-                    <th>Stock</th>
-                    <th>Commandés</th>
-                    <th>Action</th>
-                </tr>
-                <tr v-if="data.listeProduits.length === 0">
-                    <td colspan="4">Veuillez patienter, chargement des produits...</td>
-                </tr>
-                <tr v-for="produit in data.listeProduits" :key="produit.reference">
-                    <td>{{ produit.nom }}</td>
-                    <td>{{ produit.prixUnitaire }}</td>
-                    <td>{{ produit.unitesEnStock }}</td>
-                    <td>{{ produit.unitesCommandees }}</td>
-                    <td>
-                        <button @click="deleteEntity(produit._links.self.href)">
-                            Supprimer
-                        </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td><button @click="firstPage">🔙</button></td>
-                    <td><button @click="previousPage">⬅️</button></td>
-                    <td><button @click="nextPage">➡️</button></td>
-                    <td><button @click="lastPage">🔜</button></td>
-                </tr>
-            </table>
-        </div>
-    </main>
+  <main>
+    <h1>Les produits</h1>
+
+    <table>
+      <caption>Liste des produits {{ data.page + 1 }} / {{ data.totalPages }}</caption>
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Prix</th>
+          <th>Stock</th>
+          <th>Commandés</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="data.listeProduits.length === 0">
+          <td colspan="5">Veuillez patienter, chargement des produits...</td>
+        </tr>
+        <tr v-for="produit in data.listeProduits" :key="produit.reference">
+          <td>{{ produit.nom }}</td>
+          <td>{{ produit.prixUnitaire }}</td>
+          <td>{{ produit.unitesEnStock }}</td>
+          <td>{{ produit.unitesCommandees }}</td>
+          <td>
+            <button @click="deleteEntity(produit._links.self.href)">Supprimer</button>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5">
+            <button @click="firstPage">🔙</button>
+            <button @click="previousPage">⬅️</button>
+            <button @click="nextPage">➡️</button>
+            <button @click="lastPage">🔜</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
 </template>
 
 <script setup>
 import { reactive, onMounted } from "vue";
 import { doAjaxRequest } from "@/api";
 
-// Pour réinitialiser le formulaire
-const produitVide = {
-    nom: "",
-    prixUnitaire: "",
-    unitesEnStock: "",
-    unitesCommandees: "",
-};
-
-let data = reactive({
-    // Les données saisies dans le formulaire
-    formulaireProduit: { ...produitVide },
-    // La liste des catégories affichée sous forme de table
-    listeProduits: [],
-    page: 0,
-    totalPages: 0
+const data = reactive({
+  listeProduits: [],
+  page: 0,
+  totalPages: 0,
+  links: {
+    first: null,
+    previous: null,
+    next: null,
+    last: null
+  }
 });
 
 function showError(error) {
-    console.log("Erreur : status %d", error.status)
-    console.log(error.body);
-    alert(error.message);
+  console.error("Erreur : status", error.status, error.body);
+  alert(error.message);
 }
 
-function chargeProduits() {
-    // Appel à l'API pour avoir la liste des produits
-    // Triés par code, descendant
-    doAjaxRequest(`/api/produits?page=${data.page}&size=5&sort=code,desc`)
-        .then((json) => {
-            data.listeProduits = json._embedded.produits;
-            data.totalPages = json.page.totalPages;
-        })
-        .catch(showError);
+function chargeProduits(url = null) {
+  const defaultUrl = `/api/produits?page=${data.page}&size=5&sort=code,desc`;
+
+  doAjaxRequest(url || defaultUrl)
+    .then(json => {
+      data.page = json.page.number;
+      data.totalPages = json.page.totalPages;
+      data.listeProduits = json._embedded.produits || [];
+      data.links = {
+        first: json._links.first?.href || null,
+        previous: json._links.prev?.href || null,
+        next: json._links.next?.href || null,
+        last: json._links.last?.href || null
+      };
+    })
+    .catch(showError);
 }
 
-// function ajouteCategorie() {
-//     // Ajouter une catégorie avec les données du formulaire
-//     const options = {
-//         method: "POST", // Verbe HTTP POST pour ajouter un enregistrement
-//         body: JSON.stringify(data.formulaireCategorie),
-//         headers: {
-//             "Content-Type": "application/json",
-//             "Accept": "application/json"
-//         },
-//     };
-//     doAjaxRequest("/api/categories", options)
-//         .then(() => {
-//             // Réinitialiser le formulaire
-//             data.formulaireCategorie = { ...categorieVide };
-//             // Recharger la liste des catégories
-//             chargeCategories();
-//         })
-//         .catch(showError);
-// }
-// /**
-//  * Supprime une entité
-//  * @param entityRef l'URI de l'entité à supprimer
-//  */
-// function deleteEntity(entityRef) {
-//     doAjaxRequest(entityRef, { method: "DELETE", headers: { "Accept": "application/json" } })
-//         .then(chargeCategories)
-//         .catch(showError);
-// }
-function nextPage() {
-    if (data.page < data.totalPages - 1) {
-        data.page++;
-        chargeProduits();
-    } else {
-        alert("Déjà à la dernière page");
-    }
-}
+const firstPage = () => {
+  if (data.links.first) chargeProduits(data.links.first);
+};
 
-function previousPage() {
-    if (data.page > 0) {
-        data.page--;
-        chargeProduits();
-    } else {
-        alert("Déjà à la première page");
-    }
-}
+const lastPage = () => {
+  if (data.links.last) chargeProduits(data.links.last);
+};
 
-function firstPage() {
-    data.page = 0;
-    chargeProduits();
-}
+const nextPage = () => {
+  if (data.links.next) chargeProduits(data.links.next);
+};
 
-function lastPage() {
-    data.page = data.totalPages -1;
-    chargeProduits();
-}
+const previousPage = () => {
+  if (data.links.previous) chargeProduits(data.links.previous);
+};
 
-
-// A l'affichage du composant, on affiche la liste
-onMounted(chargeProduits);
-
+onMounted(() => chargeProduits());
 </script>
-
 
 <style scoped>
 td,
 th {
-    border: 1px solid #ddd;
-    padding: 8px;
+  border: 1px solid #ddd;
+  padding: 8px;
 }
-
 th {
-    padding-top: 12px;
-    padding-bottom: 12px;
-    text-align: left;
-    background-color: #232623;
-    color: rgb(255, 255, 255);
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: #232623;
+  color: white;
+}
+caption {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+button {
+  margin: 2px;
+  padding: 5px 10px;
+  cursor: pointer;
 }
 </style>
